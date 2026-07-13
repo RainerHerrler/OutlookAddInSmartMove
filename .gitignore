@@ -1,0 +1,29 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# SmartMove runtime data and diagnostics
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+# Build/debug output
+*.pdb
+TestResults/
+
+# Certificates, signing keys and private keys
+*.pfx
+*.snk
+*.pem
+*.key
+
+# Local IDE and operating-system metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

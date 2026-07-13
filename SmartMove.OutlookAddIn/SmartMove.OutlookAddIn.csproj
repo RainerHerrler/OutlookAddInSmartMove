@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>SmartMove.OutlookAddIn</AssemblyName>
+    <RootNamespace>SmartMove.OutlookAddIn</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="All" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Extensibility, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <HintPath Condition="'$(OS)' == 'Windows_NT'">$(WINDIR)\assembly\GAC\Extensibility\7.0.3300.0__b03f5f7f11d50a3a\Extensibility.dll</HintPath>
+      <HintPath Condition="'$(OS)' != 'Windows_NT'">/mnt/c/Windows/assembly/GAC/Extensibility/7.0.3300.0__b03f5f7f11d50a3a/Extensibility.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="Office, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c">
+      <HintPath Condition="'$(OS)' == 'Windows_NT'">$(WINDIR)\assembly\GAC_MSIL\Office\15.0.0.0__71e9bce111e9429c\Office.dll</HintPath>
+      <HintPath Condition="'$(OS)' != 'Windows_NT'">/mnt/c/Windows/assembly/GAC_MSIL/Office/15.0.0.0__71e9bce111e9429c/Office.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="Microsoft.Office.Interop.Outlook, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c">
+      <HintPath Condition="'$(OS)' == 'Windows_NT'">$(WINDIR)\assembly\GAC_MSIL\Microsoft.Office.Interop.Outlook\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.Outlook.dll</HintPath>
+      <HintPath Condition="'$(OS)' != 'Windows_NT'">/mnt/c/Windows/assembly/GAC_MSIL/Microsoft.Office.Interop.Outlook/15.0.0.0__71e9bce111e9429c/Microsoft.Office.Interop.Outlook.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+</Project>
