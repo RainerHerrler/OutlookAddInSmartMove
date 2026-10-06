@@ -280,9 +280,22 @@ ORDER BY t.total_count DESC, s.word COLLATE NOCASE,
 
         public static List<MoveSuggestion> GetSenderSuggestions(string senderAddress, int limit, string sourceDatabasePath = null)
         {
+            return GetAddressSuggestions(new[] { senderAddress }, limit, SuggestionSource.Sender, sourceDatabasePath);
+        }
+
+        public static List<MoveSuggestion> GetAddressSuggestions(
+            IEnumerable<string> addresses,
+            int limit,
+            SuggestionSource source,
+            string sourceDatabasePath = null)
+        {
             var result = new List<MoveSuggestion>();
             string databasePath = sourceDatabasePath ?? DatabasePath;
-            if (string.IsNullOrWhiteSpace(senderAddress) || limit <= 0 || !File.Exists(databasePath))
+            string[] distinctAddresses = addresses?
+                .Where(address => !string.IsNullOrWhiteSpace(address))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? new string[0];
+            if (distinctAddresses.Length == 0 || limit <= 0 || !File.Exists(databasePath))
             {
                 return result;
             }
@@ -294,14 +307,21 @@ ORDER BY t.total_count DESC, s.word COLLATE NOCASE,
                     connection.Open();
                     using (SQLiteCommand command = connection.CreateCommand())
                     {
+                        var parameters = new List<string>();
+                        for (int index = 0; index < distinctAddresses.Length; index++)
+                        {
+                            string name = "@address" + index;
+                            parameters.Add(name);
+                            command.Parameters.AddWithValue(name, distinctAddresses[index]);
+                        }
                         command.CommandText = @"
-SELECT f.store_id, f.entry_id, f.folder_path, s.message_count
+SELECT f.store_id, f.entry_id, f.folder_path, SUM(s.message_count)
 FROM sender_folder_stats s
 JOIN folders f ON f.id = s.folder_id
-WHERE s.sender_address = @sender COLLATE NOCASE
-ORDER BY s.message_count DESC, f.folder_path COLLATE NOCASE
+WHERE s.sender_address IN (" + string.Join(", ", parameters) + @")
+GROUP BY f.id
+ORDER BY SUM(s.message_count) DESC, f.folder_path COLLATE NOCASE
 LIMIT @limit;";
-                        command.Parameters.AddWithValue("@sender", senderAddress);
                         command.Parameters.AddWithValue("@limit", limit);
                         using (SQLiteDataReader reader = command.ExecuteReader())
                         {
@@ -313,7 +333,7 @@ LIMIT @limit;";
                                     StoreId = reader.GetString(0),
                                     FolderEntryId = reader.GetString(1),
                                     FolderPath = reader.GetString(2),
-                                    Source = SuggestionSource.Sender,
+                                    Source = source,
                                     MessageCount = count,
                                     Score = count
                                 });

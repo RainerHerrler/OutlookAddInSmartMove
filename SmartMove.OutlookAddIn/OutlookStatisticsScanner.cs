@@ -13,6 +13,7 @@ namespace SmartMove.OutlookAddIn
         private const int MaxWorkMillisecondsPerTick = 25;
         private const int PauseBetweenBatchesMilliseconds = 150;
         private const string MessageClassColumn = "http://schemas.microsoft.com/mapi/proptag/0x001A001F";
+        private const string EntryIdColumn = "EntryID";
         private const string SenderSmtpColumn = "http://schemas.microsoft.com/mapi/proptag/0x5D01001F";
         private const string SenderAddressColumn = "http://schemas.microsoft.com/mapi/proptag/0x0C1F001F";
         private const string SubjectColumn = "http://schemas.microsoft.com/mapi/proptag/0x0037001F";
@@ -22,6 +23,7 @@ namespace SmartMove.OutlookAddIn
         private readonly Action finished;
         private readonly List<FolderDescriptor> folders = new List<FolderDescriptor>();
         private readonly Timer timer;
+        private ISet<string> ownAddresses;
         private Outlook.NameSpace session;
         private StatisticsDatabase database;
         private ScanProgressForm progressForm;
@@ -46,6 +48,7 @@ namespace SmartMove.OutlookAddIn
         {
             try
             {
+                ownAddresses = SmartMoveConfiguration.LoadOwnAddresses();
                 session = application.Session;
                 DiscoverFolders();
                 if (folders.Count == 0)
@@ -139,13 +142,40 @@ namespace SmartMove.OutlookAddIn
                         if (messageClass.StartsWith("IPM.Note", StringComparison.OrdinalIgnoreCase))
                         {
                             matchedEmails++;
-                            string senderAddress = NormalizeAddress(ReadString(row, SenderSmtpColumn));
+                            string senderAddress = AddressHeuristic.Normalize(ReadString(row, SenderSmtpColumn));
                             if (string.IsNullOrEmpty(senderAddress))
                             {
-                                senderAddress = NormalizeAddress(ReadString(row, SenderAddressColumn));
+                                senderAddress = AddressHeuristic.Normalize(ReadString(row, SenderAddressColumn));
                             }
 
-                            if (!string.IsNullOrEmpty(senderAddress))
+                            if (AddressHeuristic.IsOwnSender(senderAddress, ownAddresses))
+                            {
+                                object item = null;
+                                try
+                                {
+                                    string entryId = ReadString(row, EntryIdColumn);
+                                    if (!string.IsNullOrEmpty(entryId))
+                                    {
+                                        item = session.GetItemFromID(entryId, currentFolder.StoreID);
+                                        if (item is Outlook.MailItem mailItem)
+                                        {
+                                            foreach (string address in AddressHeuristic.GetToAddresses(mailItem))
+                                            {
+                                                database.Increment(address, currentFolderId);
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (COMException exception)
+                                {
+                                    SmartMoveAddIn.WriteDiagnostic("Recipient lookup failed: " + exception.Message);
+                                }
+                                finally
+                                {
+                                    ReleaseCom(item);
+                                }
+                            }
+                            else if (!string.IsNullOrEmpty(senderAddress))
                             {
                                 database.Increment(senderAddress, currentFolderId);
                             }
@@ -354,11 +384,6 @@ namespace SmartMove.OutlookAddIn
             {
                 return string.Empty;
             }
-        }
-
-        private static string NormalizeAddress(string address)
-        {
-            return string.IsNullOrWhiteSpace(address) ? string.Empty : address.Trim().ToLowerInvariant();
         }
 
         private void ReleaseCurrentFolder()

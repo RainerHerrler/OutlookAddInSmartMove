@@ -38,6 +38,10 @@ namespace SmartMove.OutlookAddIn
             {
                 return string.Format("Move To {0} — Absender ({1:N0})", path, suggestion.MessageCount);
             }
+            if (suggestion.Source == SuggestionSource.Recipient)
+            {
+                return string.Format("Move To {0} — Empfänger ({1:N0})", path, suggestion.MessageCount);
+            }
 
             string wordLabel = suggestion.MatchedWordCount == 1 ? "1 Signalwort" : suggestion.MatchedWordCount + " Signalwörter";
             return string.Format("Move To {0} — Betreff ({1})", path, wordLabel);
@@ -139,7 +143,13 @@ namespace SmartMove.OutlookAddIn
                 selectionKey = currentKey;
                 string senderAddress = GetSenderAddress(mailItem);
                 IReadOnlyCollection<string> words = SubjectWordExtractor.Extract(mailItem.Subject);
-                List<MoveSuggestion> senderSuggestions = StatisticsDatabase.GetSenderSuggestions(senderAddress, 2);
+                ISet<string> ownAddresses = SmartMoveConfiguration.LoadOwnAddresses();
+                bool ownSender = AddressHeuristic.IsOwnSender(senderAddress, ownAddresses);
+                IEnumerable<string> addresses = ownSender
+                    ? AddressHeuristic.GetToAddresses(mailItem)
+                    : new[] { senderAddress };
+                List<MoveSuggestion> senderSuggestions = StatisticsDatabase.GetAddressSuggestions(
+                    addresses, 2, ownSender ? SuggestionSource.Recipient : SuggestionSource.Sender);
                 List<MoveSuggestion> wordCandidates = StatisticsDatabase.GetSubjectWordSuggestions(words, 10);
 
                 AddSlots(senderSuggestions, "SmartMove.SenderMove", 2);
@@ -202,7 +212,7 @@ namespace SmartMove.OutlookAddIn
                 string smtp = value as string;
                 if (!string.IsNullOrWhiteSpace(smtp))
                 {
-                    return smtp.Trim().ToLowerInvariant();
+                    return AddressHeuristic.Normalize(smtp);
                 }
             }
             catch
@@ -214,9 +224,7 @@ namespace SmartMove.OutlookAddIn
                 ReleaseCom(accessor);
             }
 
-            return string.IsNullOrWhiteSpace(mailItem.SenderEmailAddress)
-                ? string.Empty
-                : mailItem.SenderEmailAddress.Trim().ToLowerInvariant();
+            return AddressHeuristic.Normalize(mailItem.SenderEmailAddress);
         }
 
         private static string ShortenPath(string path)

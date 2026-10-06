@@ -3,6 +3,7 @@ namespace SmartMove.OutlookAddIn
     internal enum SuggestionSource
     {
         Sender,
+        Recipient,
         SubjectWords
     }
 

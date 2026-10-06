@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -53,6 +54,12 @@ namespace SmartMove.OutlookAddIn
                 getVisible=""GetSuggestionVisible""
                 onAction=""OnMoveSuggestion"" />
         <menuSeparator id=""SmartMove.SuggestionSeparator"" />
+        <button id=""SmartMove.SearchLinkedInButton""
+                label=""Absender auf LinkedIn suchen""
+                screentip=""LinkedIn-Personensuche öffnen""
+                supertip=""Sucht den Namen des Absenders im Standardbrowser auf LinkedIn.""
+                onAction=""OnSearchLinkedIn"" />
+        <menuSeparator id=""SmartMove.ToolsSeparator"" />
         <button id=""SmartMove.InitialScanButton""
                 label=""Statistik initial erstellen""
                 screentip=""Ablageordner manuell auswerten""
@@ -100,6 +107,62 @@ namespace SmartMove.OutlookAddIn
                     "SmartMove",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+            }
+        }
+
+        public void OnSearchLinkedIn(Office.IRibbonControl control)
+        {
+            WriteDiagnostic("OnSearchLinkedIn");
+            Outlook.Explorer explorer = null;
+            Outlook.Selection selection = null;
+            object selectedItem = null;
+            try
+            {
+                Outlook.Application application = outlookApplication as Outlook.Application;
+                if (application == null)
+                {
+                    throw new InvalidOperationException("Die Outlook-Anwendung ist nicht verfügbar.");
+                }
+
+                explorer = application.ActiveExplorer();
+                selection = explorer?.Selection;
+                if (selection == null || selection.Count == 0)
+                {
+                    throw new InvalidOperationException("Es ist keine E-Mail ausgewählt.");
+                }
+
+                selectedItem = selection[1];
+                if (!(selectedItem is Outlook.MailItem mailItem))
+                {
+                    throw new InvalidOperationException("Die Auswahl enthält keine E-Mail.");
+                }
+
+                string senderName = mailItem.SenderName?.Trim();
+                if (string.IsNullOrWhiteSpace(senderName))
+                {
+                    throw new InvalidOperationException("Für diese E-Mail ist kein Absendername verfügbar.");
+                }
+
+                string url = "https://www.linkedin.com/search/results/people/?keywords=" +
+                    Uri.EscapeDataString(senderName);
+                using (Process process = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }))
+                {
+                }
+            }
+            catch (Exception exception)
+            {
+                WriteDiagnostic("LinkedIn search failed: " + exception.GetType().FullName);
+                MessageBox.Show(
+                    "Die LinkedIn-Suche konnte nicht geöffnet werden.\n\n" + exception.Message,
+                    "SmartMove",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                ReleaseCom(selectedItem);
+                ReleaseCom(selection);
+                ReleaseCom(explorer);
             }
         }
 
@@ -182,6 +245,14 @@ namespace SmartMove.OutlookAddIn
         {
             outlookApplication = application;
             WriteDiagnostic("OnConnection: " + connectMode);
+            try
+            {
+                SmartMoveConfiguration.EnsureFileExists();
+            }
+            catch (Exception exception)
+            {
+                WriteDiagnostic("Configuration initialization failed: " + exception);
+            }
         }
 
         public void OnDisconnection(ext_DisconnectMode removeMode, ref Array custom)
@@ -213,6 +284,14 @@ namespace SmartMove.OutlookAddIn
             }
 
             outlookApplication = null;
+        }
+
+        private static void ReleaseCom(object value)
+        {
+            if (value != null && Marshal.IsComObject(value))
+            {
+                Marshal.ReleaseComObject(value);
+            }
         }
 
         internal static void WriteDiagnostic(string message)

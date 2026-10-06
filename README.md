@@ -3,7 +3,8 @@
 Im Kontextmenü einer E-Mail erscheint das Untermenü **SmartMove**. Es kann eine
 lokale Ablagestatistik manuell erstellen, nach JSON exportieren und daraus
 dynamische Zielordner vorschlagen. Ein Klick auf einen Vorschlag verschiebt die
-ausgewählte E-Mail direkt.
+ausgewählte E-Mail direkt. Außerdem lässt sich der Absendername mit einem Klick
+in der LinkedIn-Personensuche öffnen.
 
 ## Voraussetzung
 
@@ -28,7 +29,8 @@ klassische Outlook unter Windows.
 4. Klassisches Outlook starten.
 5. In der Nachrichtenliste eine E-Mail rechtsklicken. Dort steht **SmartMove**
    mit dynamischen **Move To …**-Vorschlägen sowie den Befehlen
-   **Statistik initial erstellen** und **Statistik als JSON exportieren**.
+   **Absender auf LinkedIn suchen**, **Statistik initial erstellen** und
+   **Statistik als JSON exportieren**.
 
 Der erste Build lädt einmalig die .NET-4.8-Referenzassemblies über NuGet. Die
 Installation wird ausschließlich für den aktuellen Windows-Benutzer registriert.
@@ -68,6 +70,47 @@ COM-Add-In-Einstellungen prüfen, ob SmartMove blockiert ist. Das
 Installationsskript entfernt ausschließlich alte SmartMove-Einträge aus
 Outlooks `CrashingAddinList` und `DisabledItems`.
 
+## Eigene E-Mail-Adressen konfigurieren
+
+SmartMove erkennt gesendete beziehungsweise selbst weitergeleitete Nachrichten
+an einer frei konfigurierbaren Liste eigener E-Mail-Adressen. Die Datei wird
+beim ersten Start von Outlook automatisch angelegt und liegt unter:
+
+```text
+%LOCALAPPDATA%\SmartMove\settings.json
+```
+
+`%LOCALAPPDATA%` steht dabei für das lokale Anwendungsdatenverzeichnis des
+aktuellen Windows-Benutzers. Zum Bearbeiten kann die Datei beispielsweise mit
+folgendem PowerShell-Befehl in Editor geöffnet werden:
+
+```powershell
+notepad "$env:LOCALAPPDATA\SmartMove\settings.json"
+```
+
+Unter `ownAddresses` werden alle eigenen Adressen und Aliase eingetragen. Es
+können beliebig viele Adressen konfiguriert werden:
+
+```json
+{
+  "ownAddresses": [
+    "vorname.nachname@example.org",
+    "alias@example.org"
+  ]
+}
+```
+
+Groß- und Kleinschreibung spielt keine Rolle; Leerraum am Anfang und Ende wird
+entfernt und doppelte Einträge werden ignoriert. Die Konfiguration gilt nur für
+den jeweiligen Windows-Benutzer und wird nicht im Projektverzeichnis abgelegt.
+
+Nach jeder Änderung an `settings.json` muss **Statistik initial erstellen**
+erneut ausgeführt werden. Dadurch wird die bestehende Statistik vollständig mit
+der neuen Adressliste aufgebaut. Eine Nachricht, deren Absender in
+`ownAddresses` steht, wird anhand ihrer „An“-Empfänger ausgewertet. Bei allen
+anderen Nachrichten verwendet SmartMove weiterhin die Absenderadresse. Ist die
+Liste leer, findet keine besondere Behandlung eigener Nachrichten statt.
+
 ## Statistik
 
 Der Scan wird ausschließlich manuell über
@@ -77,11 +120,14 @@ Posteingang, Gesendet, Postausgang, Entwürfe, Papierkorb, Junk, Suchordner und
 technische Synchronisationsordner werden ausgelassen. Unterordner des
 Posteingangs werden als mögliche Ablageordner berücksichtigt.
 
-SmartMove liest pro Nachricht nur Nachrichtenklasse, Absenderadresse und
-Betreff. Nachrichtentext und Anhänge werden nicht gelesen. Der vollständige
-Betreff wird nicht gespeichert. Gespeichert werden:
+SmartMove liest pro Nachricht Nachrichtenklasse, Absenderadresse und Betreff.
+Steht der Absender in der konfigurierten Liste `ownAddresses`, liest es
+zusätzlich die „An“-Empfänger und verwendet deren E-Mail-Adressen statt der
+Absenderadresse. Bei mehreren „An“-Empfängern zählt jede unterschiedliche
+Adresse einmal pro Nachricht. Nachrichtentext und Anhänge werden nicht gelesen.
+Der vollständige Betreff wird nicht gespeichert. Gespeichert werden:
 
-- je Absender-/Ordnerpaar die Anzahl der E-Mails,
+- je Absender- beziehungsweise Empfänger-/Ordnerpaar die Anzahl der E-Mails,
 - je signifikantem Betreffwort/Ordnerpaar die Anzahl der E-Mails,
 - Outlook-Ordnerkennung und lesbarer Ordnerpfad.
 
@@ -105,8 +151,10 @@ höchstens 100 Tabellenzeilen beziehungsweise ungefähr 25 Millisekunden Arbeit
 ausgeführt; anschließend pausiert der Scanner mindestens 150 Millisekunden.
 
 Der JSON-Export wird über das SmartMove-Untermenü gestartet. Der Speicherort ist
-frei wählbar. Absender und Betreffwörter werden nach ihrer gesamten
+frei wählbar. Adressen und Betreffwörter werden nach ihrer gesamten
 Nachrichtenanzahl und deren Ordner jeweils absteigend nach Häufigkeit ausgegeben.
+Die Adressen stehen aus Kompatibilitätsgründen weiterhin unter dem JSON-Schlüssel
+`senders`.
 
 Beispiel für das Exportformat:
 
@@ -132,7 +180,8 @@ Beispiel für das Exportformat:
 Oben im SmartMove-Untermenü erscheinen, soweit genügend historische Daten
 vorhanden sind:
 
-- die zwei häufigsten Ziele für den Absender,
+- die zwei häufigsten Ziele für den Absender beziehungsweise, bei einer eigenen
+  konfigurierten Absenderadresse, für die „An“-Empfänger,
 - die zwei am besten bewerteten Ziele für die Signalwörter im Betreff.
 
 Bei der Betreffbewertung zählt neben der Häufigkeit auch, wie eindeutig ein Wort
@@ -154,6 +203,13 @@ E-Mails verschoben; die Vorschläge basieren dabei auf der ersten Nachricht. Zur
 kompakten Anzeige enthält der Menütext nur die letzten beiden Ebenen des
 Ordnerpfads. Intern bleibt der Zielordner über StoreID und EntryID eindeutig.
 
+## LinkedIn-Suche
+
+**SmartMove > Absender auf LinkedIn suchen** öffnet die LinkedIn-Personensuche
+für den Anzeigenamen des Absenders im Standardbrowser. SmartMove speichert keine
+LinkedIn-Zugangsdaten und greift nicht automatisiert auf LinkedIn-Profile zu.
+Eine vorhandene LinkedIn-Anmeldung des Browsers wird verwendet.
+
 ## Aktuelle Grenzen und mögliche Ausbaustufen
 
 Aktuell lernt SmartMove nur durch einen erneuten manuellen Komplettscan. Mögliche
@@ -167,11 +223,14 @@ nächste Schritte sind:
 
 ## Datenschutz
 
-Alle Statistikdaten bleiben lokal unter `%LOCALAPPDATA%\SmartMove`. SmartMove
-überträgt keine Daten an externe Dienste. Gespeichert werden Absenderadressen,
+Alle Statistikdaten bleiben lokal unter `%LOCALAPPDATA%\SmartMove` und werden
+nicht an externe Dienste übertragen. Gespeichert werden Absenderadressen oder
+bei Nachrichten von konfigurierten eigenen Adressen „An“-Empfängeradressen,
 normalisierte Signalwörter, Ordnerkennungen, Ordnerpfade und aggregierte
-Trefferzahlen. Nachrichtentexte, Anhänge und vollständige Betreffzeilen werden
-nicht gespeichert.
+Trefferzahlen. Auch `settings.json` bleibt lokal. Nachrichtentexte, Anhänge und
+vollständige Betreffzeilen werden nicht gespeichert. Nur wenn **Absender auf
+LinkedIn suchen** angeklickt wird, wird der Anzeigename des Absenders als
+Suchbegriff an LinkedIn übergeben.
 
 ## Lizenz
 
